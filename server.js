@@ -1,29 +1,23 @@
 const express = require("express")
 const http = require("http")
-const WebSocket = require("ws")
 const QRCode = require("qrcode")
 
 const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys")
 
 const app = express()
-const server = http.createServer(app)
-const wss = new WebSocket.Server({ server })
 
 let sock
-let clients = []
 let lastQR = null
 
-// ROTA PRA TESTAR NO NAVEGADOR
 app.get("/", (req, res) => {
   res.send("Servidor WhatsApp rodando 🚀")
 })
 
-// ROTA PRA VER QR CODE
 app.get("/qr", (req, res) => {
   if (lastQR) {
     res.send(`<img src="${lastQR}" />`)
   } else {
-    res.send("QR ainda não gerado, aguarde...")
+    res.send("Gerando QR... atualize em 5s")
   }
 })
 
@@ -32,7 +26,7 @@ async function startWhatsApp() {
 
   sock = makeWASocket({
     auth: state,
-    printQRInTerminal: false
+    printQRInTerminal: true
   })
 
   sock.ev.on("connection.update", async (update) => {
@@ -40,40 +34,25 @@ async function startWhatsApp() {
 
     if (qr) {
       lastQR = await QRCode.toDataURL(qr)
-      broadcast({ type: "qr", data: lastQR })
+      console.log("QR GERADO!")
     }
 
     if (connection === "open") {
       console.log("WhatsApp conectado!")
-      broadcast({ type: "status", data: "connected" })
+    }
+
+    if (connection === "close") {
+      console.log("Reconectando...")
+      startWhatsApp()
     }
   })
 
   sock.ev.on("creds.update", saveCreds)
-
-  sock.ev.on("messages.upsert", (msg) => {
-    const message = msg.messages[0]
-    if (!message.key.fromMe) {
-      broadcast({
-        type: "message",
-        data: message.message?.conversation || "Mensagem recebida"
-      })
-    }
-  })
 }
-
-function broadcast(data) {
-  clients.forEach(c => c.send(JSON.stringify(data)))
-}
-
-wss.on("connection", (ws) => {
-  clients.push(ws)
-})
 
 startWhatsApp()
 
-server.listen(3000, () => {
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => {
   console.log("Servidor rodando")
-})
-  
-      
+})      
