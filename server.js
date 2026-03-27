@@ -11,6 +11,21 @@ const wss = new WebSocket.Server({ server })
 
 let sock
 let clients = []
+let lastQR = null
+
+// ROTA PRA TESTAR NO NAVEGADOR
+app.get("/", (req, res) => {
+  res.send("Servidor WhatsApp rodando 🚀")
+})
+
+// ROTA PRA VER QR CODE
+app.get("/qr", (req, res) => {
+  if (lastQR) {
+    res.send(`<img src="${lastQR}" />`)
+  } else {
+    res.send("QR ainda não gerado, aguarde...")
+  }
+})
 
 async function startWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState("auth")
@@ -24,11 +39,12 @@ async function startWhatsApp() {
     const { connection, qr } = update
 
     if (qr) {
-      const qrImage = await QRCode.toDataURL(qr)
-      broadcast({ type: "qr", data: qrImage })
+      lastQR = await QRCode.toDataURL(qr)
+      broadcast({ type: "qr", data: lastQR })
     }
 
     if (connection === "open") {
+      console.log("WhatsApp conectado!")
       broadcast({ type: "status", data: "connected" })
     }
   })
@@ -59,3 +75,5 @@ startWhatsApp()
 server.listen(3000, () => {
   console.log("Servidor rodando")
 })
+  
+      
